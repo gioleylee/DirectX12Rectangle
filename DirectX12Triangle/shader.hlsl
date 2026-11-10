@@ -40,7 +40,8 @@ PSInput VSMain(unsigned int index : SV_VertexID) {
     rotated_pos.y = input_pos.x * sinTheta + input_pos.y * cosTheta;
     
     output.position = float4(rotated_pos.x, rotated_pos.y, 0.0f, 1.0f);
-    output.color = colors[index];
+    // Six vertices share three colors; indexing past the array reads undefined values.
+    output.color = colors[index % 3];
     return output;
 }
 

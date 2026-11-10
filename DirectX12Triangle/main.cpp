@@ -68,6 +68,13 @@ void set_depth_stencil_state(D3D12_DEPTH_STENCIL_DESC &depth_stencil_desc) {
     depth_stencil_desc.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 }
 
+// Stops with a readable message instead of dereferencing a null COM pointer.
+static void require(bool ok, const wchar_t *what) {
+    if (ok) return;
+    MessageBoxW(nullptr, what, L"DirectX12Rectangle", MB_OK | MB_ICONERROR);
+    ExitProcess(1);
+}
+
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
         case WM_DESTROY:
@@ -92,14 +99,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     wc.lpszClassName = L"DirectX12Triangle";
     RegisterClass(&wc);
 
-    // Create a window
-    HWND hwnd = CreateWindow(wc.lpszClassName, L"DirectX 12 Triangle", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, width, height, nullptr, nullptr, hInstance, nullptr);
+    // Create a window whose client area, not its outer frame, is width x height.
+    // Otherwise the 800x800 back buffer is stretched into a smaller client area.
+    RECT window_rect = { 0, 0, width, height };
+    AdjustWindowRect(&window_rect, WS_OVERLAPPEDWINDOW, FALSE);
+    HWND hwnd = CreateWindow(wc.lpszClassName, L"DirectX 12 Rectangle", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, window_rect.right - window_rect.left, window_rect.bottom - window_rect.top,
+        nullptr, nullptr, hInstance, nullptr);
+    require(hwnd != nullptr, L"Could not create the window.");
     ShowWindow(hwnd, nCmdShow);
 
     //The device is like a virtual representation of the GPU
     ID3D12Device *device = nullptr;
     HRESULT hr = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
+    require(SUCCEEDED(hr) && device, L"No Direct3D 12 capable graphics device was found.");
 
     //command queue decides which order the command lists should execute. In our case, we only have one command list.
     ID3D12CommandQueue *command_queue = nullptr;
@@ -136,6 +149,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     IDXGISwapChain *temp_swap_chain = nullptr;
     hr = factory->CreateSwapChain(command_queue, &swap_chain_desc, &temp_swap_chain);
+    require(SUCCEEDED(hr) && temp_swap_chain, L"Could not create the swap chain.");
 
     //cast the swap chain to IDXGISwapChain3 to leverage the latest features
     IDXGISwapChain3 *swap_chain = {};
@@ -206,6 +220,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ID3DBlob *pixel_shader = nullptr;
     hr = D3DCompileFromFile(L"shader.hlsl", nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, &vertex_shader, nullptr);
     hr = D3DCompileFromFile(L"shader.hlsl", nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, &pixel_shader, nullptr);
+    require(vertex_shader && pixel_shader, L"Could not compile shader.hlsl.\n\n"
+        L"Run the program from the folder that contains shader.hlsl "
+        L"(Visual Studio does this when you press F5).");
 
     // Pipeline state
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {};
@@ -229,6 +246,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     ID3D12PipelineState *pipeline_state = nullptr;
     hr = device->CreateGraphicsPipelineState(&pso_desc, IID_PPV_ARGS(&pipeline_state));
+    require(SUCCEEDED(hr) && pipeline_state, L"Could not create the graphics pipeline state.");
 
     vertex_shader->Release();
     vertex_shader = nullptr;
@@ -248,8 +266,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
+        // The window is gone after WM_QUIT; do not render another frame into it.
+        if (!running) {
+            break;
+        }
 
-        // Record commands to draw a triangle
+        // Record commands to draw the rectangle
         hr = command_allocator->Reset();
         hr = command_list->Reset(command_allocator, nullptr);
 
@@ -317,4 +339,23 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         triangle_angle++;
     }
+
+    // Release everything in reverse order of creation. Each frame waits for the
+    // GPU, so nothing is still in use here.
+    CloseHandle(fence_event);
+    pipeline_state->Release();
+    root_signature->Release();
+    fence->Release();
+    for (ID3D12Resource *render_target : render_targets) {
+        render_target->Release();
+    }
+    rtv_heap->Release();
+    swap_chain->Release();
+    factory->Release();
+    command_list->Release();
+    command_allocator->Release();
+    command_queue->Release();
+    device->Release();
+
+    return 0;
 }

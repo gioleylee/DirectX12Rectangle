@@ -17,8 +17,8 @@ The goal of this project is to provide a clean and easy-to-understand starting p
 * Direct3D 12 initialization
 * Window creation and swap chain setup
 * Command queue and command list usage
-* Basic vertex buffer for rendering geometry
-* Renders a rectangle using GPU pipeline
+* Renders a rotating rectangle from two triangles generated in the vertex shader (no vertex buffer needed)
+* Passes the rotation angle to the shader as a root constant
 * Double buffering
 
 ---
@@ -37,12 +37,12 @@ The goal of this project is to provide a clean and easy-to-understand starting p
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/DirectX12Rectangle.git
+git clone https://github.com/gioleylee/DirectX12Rectangle.git
 ```
 
 ### 2. Open the project
 
-* Open the `.sln` file in Visual Studio
+* Open `DirectX12Triangle.sln` in Visual Studio
 
 ### 3. Build
 
@@ -54,21 +54,20 @@ git clone https://github.com/YOUR_USERNAME/DirectX12Rectangle.git
 * Press `F5` to run with debugger
 * Or `Ctrl + F5` to run without debugger
 
+The program compiles `shader.hlsl` at startup, so it must be started from the
+`DirectX12Triangle` folder. Visual Studio does this automatically.
+
 ---
 
 ## 📁 Project Structure
 
 ```text
 DirectX12Rectangle/
-│
-├── DirectX12Rectangle.sln
-├── DirectX12Rectangle/
-│   ├── DirectX12Rectangle.vcxproj
-│   ├── src/
-│   ├── include/
-│   ├── shaders/
-│   └── assets/
-│
+├── DirectX12Triangle.sln
+├── DirectX12Triangle/
+│   ├── DirectX12Triangle.vcxproj
+│   ├── main.cpp        # window, device setup, and render loop
+│   └── shader.hlsl     # vertex and pixel shaders
 └── README.md
 ```
 
@@ -88,7 +87,7 @@ This project helps you understand:
 ## ⚠️ Notes
 
 * This project focuses on simplicity rather than optimization
-* Error handling is minimal for clarity
+* Error handling is minimal: startup failures show a message and exit
 * Intended for educational purposes
 
 ---
